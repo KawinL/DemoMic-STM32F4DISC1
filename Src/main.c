@@ -68,7 +68,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
   uint16_t pdm_buffer=0;      // Buffer for pdm value from hi2s2 (Mic)
-  uint8_t  pcm_buffer=0;      // Buffer for pcm value calculated form pdm_fubber
+  uint8_t  pcm_buffer=0;      // Buffer for pcm value calculated from pdm_buffer
                               // value range is 0-16, 8-bit is chosen because it
                               // can store 0-255
   uint8_t uart_display_buffer = "||||||||||||||||\r\n";
