@@ -67,7 +67,12 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  uint16_t pdm_buffer=0;      // Buffer for pdm value from hi2s2 (Mic)
+  uint8_t  pcm_buffer=0;      // Buffer for pcm value calculated form pdm_fubber
+                              // value range is 0-16, 8-bit is chosen because it
+                              // can store 0-255
+  uint8_t uart_display_buffer = "||||||||||||||||\r\n";
+                              // 16 '|' followed by '\r' and '\n'
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -89,47 +94,40 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-  uint16_t pData=0;
-  char number[15];
-
   while (1)
   {
+	  HAL_I2S_Receive(&hi2s2, &pdm_buffer, 1, 1000); // Receive PDM from Mic
+    pcm_buffer = 0;
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-	  HAL_I2S_Receive(&hi2s2, &pData, 1, 1000);
-	  uint16_t temp = pData;
 
-//	  itoa(pData,number,10);
-	  int i = 0 ,n=0;
-//	  HAL_UART_Transmit(&huart2,"v = ",4,100);
-//	  while(number[i]!='\0'){
-//		  HAL_UART_Transmit(&huart2,&number[i],1,10000);
-//		  i++;
-//	  }
-//	  HAL_UART_Transmit(&huart2,"\n\r",2,100);
-
-
-//	  HAL_Delay(500);
-
-	  for(i=0;i<16;i++)
-	  {
-	      n+=pData%2;
-	      if(pData%2==1)
-	      {
-	    	  HAL_UART_Transmit(&huart2,"|",1,100);
-	      }
-	      pData/=2;
+    // calculate PCM value
+	  while ( pdm_buffer != 0 )                     // while pdm_buffer still have 1s in binary
+    {
+	    pcm_buffer ++;
+	    pdm_buffer ^= pdm_buffer & -pdm_buffer;     // remove left most 1 in binary
 	  }
-	  if(n>9){
-		  HAL_GPIO_WritePin(GPIOD,GPIO_PIN_13,1);
+
+    // Toggle LED for data visualization
+	  if ( pcm_buffer > 9 )                         // if sound is loud enough (range 10-16)
+    {
+		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
 	  }
-	  else{
-		  HAL_GPIO_WritePin(GPIOD,GPIO_PIN_13,0);
+    else
+    {
+		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
 	  }
-	  HAL_UART_Transmit(&huart2,"\n\r",2,100);
-	  HAL_GPIO_TogglePin(GPIOD,GPIO_PIN_14);
+	  HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
+
+    // send UART for visualization
+    HAL_UART_Transmit(
+      &huart2,
+      uart_display_buffer +16 -number,            // if number == 16 send all of uart buffer
+                                                  // if number == 0  only send the "\r\n"
+      sizeof(uart_display_buffer) -16 +number,    // if number == 16 size is 16 + sizeof("\r\n")
+                                                  // if number == 0  size is  0 + sizeof("\r\n")
+      100);
   }
   /* USER CODE END 3 */
 
@@ -228,9 +226,9 @@ static void MX_USART2_UART_Init(void)
 
 }
 
-/** Configure pins as 
-        * Analog 
-        * Input 
+/** Configure pins as
+        * Analog
+        * Input
         * Output
         * EVENT_OUT
         * EXTI
@@ -268,7 +266,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
+  HAL_GPIO_WritePin(GPIOD, LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin
                           |Audio_RST_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : CS_I2C_SPI_Pin */
@@ -307,9 +305,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BOOT1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin 
+  /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin
                            Audio_RST_Pin */
-  GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin 
+  GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin
                           |Audio_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -379,10 +377,10 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler */
   /* User can add his own implementation to report the HAL error return state */
-  while(1) 
+  while(1)
   {
   }
-  /* USER CODE END Error_Handler */ 
+  /* USER CODE END Error_Handler */
 }
 
 #ifdef USE_FULL_ASSERT
@@ -407,10 +405,10 @@ void assert_failed(uint8_t* file, uint32_t line)
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-*/ 
+*/
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
