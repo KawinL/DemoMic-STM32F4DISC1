@@ -123,9 +123,9 @@ int main(void)
     // send UART for visualization
     HAL_UART_Transmit(
       &huart2,
-      uart_display_buffer +16 -number,            // if number == 16 send all of uart buffer
+      uart_display_buffer +16 -pcm_buffer,            // if number == 16 send all of uart buffer
                                                   // if number == 0  only send the "\r\n"
-      sizeof(uart_display_buffer) -16 +number,    // if number == 16 size is 16 + sizeof("\r\n")
+      sizeof(uart_display_buffer) -16 +pcm_buffer,    // if number == 16 size is 16 + sizeof("\r\n")
                                                   // if number == 0  size is  0 + sizeof("\r\n")
       100);
   }
