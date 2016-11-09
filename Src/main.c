@@ -61,18 +61,30 @@ static void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN 0 */
 
+#define PDM_BUFFER_SIZE 20
+#define LEAKY_KEEP_RATE 0.95
+#define UART_DEBUG_TICK_RATE 100
+#define PDM_BLOCK_SIZE_BITS 16
+
 /* USER CODE END 0 */
 
 int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  uint16_t pdm_buffer=0;      // Buffer for pdm value from hi2s2 (Mic)
-  uint8_t  pcm_buffer=0;      // Buffer for pcm value calculated from pdm_buffer
-                              // value range is 0-16, 8-bit is chosen because it
-                              // can store 0-255
-  uint8_t uart_display_buffer = "||||||||||||||||\r\n";
-                              // 16 '|' followed by '\r' and '\n'
+  uint16_t pdm_buffer[PDM_BUFFER_SIZE]; // Buffer for pdm value from hi2s2 (Mic)
+  uint16_t pdm_value=0;      
+  uint8_t  pcm_value=0;                 // For keeping pcm value calculated from pdm_value
+                                        // value range is 0-16, 8-bit is chosen because it
+                                        // can store 0-255
+  uint32_t last_tick = HAL_GetTick();
+  uint32_t this_tick;
+
+  uint8_t uart_display_buffer[16];
+
+  float leaky_pcm_buffer = 0.0;         // Fast Estimation of moving average of PDM
+  float leaky_amp_buffer = 0.0;         // Fast Estimation of moving average of abs(PCM)
+                              
   /* USER CODE END 1 */
 
   /* MCU Configuration----------------------------------------------------------*/
@@ -96,38 +108,36 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_I2S_Receive(&hi2s2, &pdm_buffer, 1, 1000); // Receive PDM from Mic
-    pcm_buffer = 0;
+    HAL_I2S_Receive(&hi2s2, pdm_buffer, PDM_BUFFER_SIZE, 1000); // Receive PDM from Mic
   /* USER CODE END WHILE */
 
   /* USER CODE BEGIN 3 */
-
-    // calculate PCM value
-    while ( pdm_buffer != 0 )                     // while pdm_buffer still have 1s in binary
-    {
-      pcm_buffer ++;
-      pdm_buffer ^= pdm_buffer & -pdm_buffer;     // remove left most 1 in binary
+    for(i=0; i<PDM_BUFFER_SIZE; i++){
+      pcm_value = -PDM_BLOCK_SIZE_BITS/2;
+      pdm_value = pdm_buffer[i];
+      // calculate PCM value
+      while ( pdm_value != 0 )                     // while pdm_value still have 1s in binary
+      {
+        pcm_value ++;
+        pdm_value ^= pdm_value & -pdm_value;       // remove left most 1 in binary
+      }
+      leaky_pcm_buffer += pcm_value;
+      leaky_pcm_buffer *= LEAKY_KEEP_RATE;
+      leaky_amp_buffer += abs(leaky_pcm_buffer);
+      leaky_amp_buffer *= LEAKY_KEEP_RATE;
     }
 
-    // Toggle LED for data visualization
-    if ( pcm_buffer > 9 )                         // if sound is loud enough (range 10-16)
-    {
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+    this_tick = HAL_GetTick();
+    if(this_tick - last_tick > UART_DEBUG_TICK_RATE){
+      last_tick = this_tick;
+      sprintf(uart_temp_display_buffer, "L : %d\n", leaky_amp_buffer);
+      // send UART for visualization
+      HAL_UART_Transmit(
+        &huart2,
+        uart_temp_display_buffer,
+        strlen(uart_temp_display_buffer),
+        100);
     }
-    else
-    {
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
-    }
-    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_14);
-
-    // send UART for visualization
-    HAL_UART_Transmit(
-      &huart2,
-      uart_display_buffer +16 -pcm_buffer,            // if number == 16 send all of uart buffer
-                                                  // if number == 0  only send the "\r\n"
-      sizeof(uart_display_buffer) -16 +pcm_buffer,    // if number == 16 size is 16 + sizeof("\r\n")
-                                                  // if number == 0  size is  0 + sizeof("\r\n")
-      100);
   }
   /* USER CODE END 3 */
 
