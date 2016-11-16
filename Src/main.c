@@ -61,6 +61,10 @@ static void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN 0 */
 
+float float_abs(float in){
+	return in < 0 ? -in : in;
+}
+
 #define PDM_BUFFER_SIZE 20
 #define LEAKY_KEEP_RATE 0.95
 #define UART_DEBUG_TICK_RATE 100
@@ -72,6 +76,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  uint8_t i;
+
   uint16_t pdm_buffer[PDM_BUFFER_SIZE]; // Buffer for pdm value from hi2s2 (Mic)
   uint16_t pdm_value=0;      
   uint8_t  pcm_value=0;                 // For keeping pcm value calculated from pdm_value
@@ -80,7 +86,7 @@ int main(void)
   uint32_t last_tick = HAL_GetTick();
   uint32_t this_tick;
 
-  uint8_t uart_display_buffer[16];
+  char uart_temp_display_buffer[16];
 
   float leaky_pcm_buffer = 0.0;         // Fast Estimation of moving average of PDM
   float leaky_amp_buffer = 0.0;         // Fast Estimation of moving average of abs(PCM)
@@ -123,18 +129,18 @@ int main(void)
       }
       leaky_pcm_buffer += pcm_value;
       leaky_pcm_buffer *= LEAKY_KEEP_RATE;
-      leaky_amp_buffer += abs(leaky_pcm_buffer);
+      leaky_amp_buffer += float_abs(leaky_pcm_buffer);
       leaky_amp_buffer *= LEAKY_KEEP_RATE;
     }
 
     this_tick = HAL_GetTick();
     if(this_tick - last_tick > UART_DEBUG_TICK_RATE){
       last_tick = this_tick;
-      sprintf(uart_temp_display_buffer, "L : %d\n", leaky_amp_buffer);
+      sprintf(uart_temp_display_buffer, "L : %d\n", (int)leaky_amp_buffer);
       // send UART for visualization
       HAL_UART_Transmit(
         &huart2,
-        uart_temp_display_buffer,
+		(uint8_t*)uart_temp_display_buffer,
         strlen(uart_temp_display_buffer),
         100);
     }
